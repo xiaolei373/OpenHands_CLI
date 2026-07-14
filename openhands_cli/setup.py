@@ -6,6 +6,7 @@ from rich.console import Console
 
 from openhands.sdk import Agent, AgentContext, BaseConversation, Conversation, Workspace
 from openhands.sdk.context import Skill
+from openhands.sdk.conversation.visualizer import ConversationVisualizerBase
 from openhands.sdk.event.base import Event
 from openhands.sdk.hooks import HookConfig
 from openhands.sdk.security.confirmation_policy import (
@@ -17,7 +18,6 @@ from openhands.tools.preset.default import register_builtins_agents
 # Register tools on import
 from openhands_cli.locations import get_conversations_dir, get_work_dir
 from openhands_cli.stores import AgentStore
-from openhands_cli.tui.widgets.richlog_visualizer import ConversationVisualizer
 
 
 class MissingAgentSpec(Exception):
@@ -32,7 +32,6 @@ def load_agent_specs(
     skills: list[Skill] | None = None,
     *,
     env_overrides_enabled: bool = False,
-    critic_disabled: bool = False,
 ) -> Agent:
     """Load agent specifications.
 
@@ -43,7 +42,6 @@ def load_agent_specs(
         env_overrides_enabled: If True, environment variables will override
             stored LLM settings, and agent can be created from env vars if no
             disk config exists.
-        critic_disabled: If True, critic functionality will be disabled.
 
     Returns:
         Configured Agent instance
@@ -55,7 +53,6 @@ def load_agent_specs(
     agent = agent_store.load_or_create(
         session_id=conversation_id,
         env_overrides_enabled=env_overrides_enabled,
-        critic_disabled=critic_disabled,
     )
     if not agent:
         raise MissingAgentSpec(
@@ -94,12 +91,13 @@ def load_agent_specs(
 def setup_conversation(
     conversation_id: UUID,
     confirmation_policy: ConfirmationPolicyBase,
-    visualizer: ConversationVisualizer | None = None,
+    visualizer: ConversationVisualizerBase
+    | type[ConversationVisualizerBase]
+    | None = None,
     event_callback: Callable[[Event], None] | None = None,
     console: Console | None = None,
     *,
     env_overrides_enabled: bool = False,
-    critic_disabled: bool = False,
 ) -> BaseConversation:
     """
     Setup the conversation with agent.
@@ -114,7 +112,6 @@ def setup_conversation(
         env_overrides_enabled: If True, environment variables will override
             stored LLM settings, and agent can be created from env vars if no
             disk config exists.
-        critic_disabled: If True, critic functionality will be disabled.
 
     Raises:
         MissingAgentSpec: If agent specification is not found or invalid.
@@ -132,7 +129,6 @@ def setup_conversation(
     agent = load_agent_specs(
         str(conversation_id),
         env_overrides_enabled=env_overrides_enabled,
-        critic_disabled=critic_disabled,
     )
 
     # Prepare callbacks list
@@ -155,7 +151,7 @@ def setup_conversation(
         hook_config=hook_config,
     )
 
-    conversation.set_security_analyzer(LLMSecurityAnalyzer())
+    # conversation.set_security_analyzer(LLMSecurityAnalyzer())
     conversation.set_confirmation_policy(confirmation_policy)
 
     console.print(f"✓ Agent initialized with model: {agent.llm.model}", style="green")

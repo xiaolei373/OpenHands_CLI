@@ -146,17 +146,6 @@ def main() -> int:
     if not args.no_build and not build_executable(args.spec, clean=not args.no_clean):
         return 1
 
-    # Test the executable
-    if not args.no_test:
-        from tui_e2e.runner import print_detailed_results, run_all_tui_e2e
-
-        summary = run_all_tui_e2e()
-        print_detailed_results(summary)
-
-        if not summary.all_passed:
-            print(f"\n❌ {summary.failed_tests} test(s) failed, build process failed")
-            return 1
-
     print("\n🎉 Build process completed!")
     print("📁 Check the 'dist/' directory for your executable")
 

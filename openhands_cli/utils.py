@@ -1,6 +1,5 @@
 """Utility functions for LLM configuration in OpenHands CLI."""
 
-import json
 import os
 import platform
 import re
@@ -10,47 +9,13 @@ from typing import Any
 
 from rich.console import Console
 
-from openhands.sdk import LLM, Agent, ImageContent, TextContent
-from openhands.sdk.event import SystemPromptEvent
-from openhands.sdk.event.base import Event
+from openhands.sdk import LLM, Agent
 from openhands.sdk.tool import Tool
 from openhands.tools import TaskToolSet
-from openhands.tools.delegate import DelegateTool
 from openhands.tools.file_editor import FileEditorTool
 from openhands.tools.preset.default import get_default_condenser
 from openhands.tools.task_tracker import TaskTrackerTool
 from openhands.tools.terminal import TerminalTool
-
-
-def abbreviate_number(n: int | float) -> str:
-    """Abbreviate large numbers with K/M/B suffixes.
-
-    Examples:
-        1234 -> '1.23K'
-        1200000 -> '1.2M'
-        2500000000 -> '2.5B'
-        999 -> '999'
-    """
-    n = int(n or 0)
-    if n >= 1_000_000_000:
-        val, suffix = n / 1_000_000_000, "B"
-    elif n >= 1_000_000:
-        val, suffix = n / 1_000_000, "M"
-    elif n >= 1_000:
-        val, suffix = n / 1_000, "K"
-    else:
-        return str(n)
-    return f"{val:.2f}".rstrip("0").rstrip(".") + suffix
-
-
-def format_cost(cost: float) -> str:
-    """Format cost value for display.
-
-    Returns '0.00' for zero or negative costs, otherwise formats to 4 decimal places.
-    """
-    if cost <= 0:
-        return "0.00"
-    return f"{cost:.4f}"
 
 
 def get_os_description() -> str:
@@ -160,28 +125,13 @@ def get_llm_metadata(
     return metadata
 
 
-def get_default_cli_tools(*, use_delegate_tool: bool = False) -> list[Tool]:
-    """Get the default tool specifications for CLI mode (browser disabled).
-
-    Args:
-        use_delegate_tool: If True, use DelegateTool instead of TaskToolSet.
-            This is used for backward compatibility with conversations that
-            already have DelegateTool events. Defaults to False (use TaskToolSet).
-
-    Returns:
-        List of Tool specifications for the CLI agent.
-
-    Note:
-        DelegateTool is deprecated in favor of TaskToolSet for new conversations.
-        Existing conversations with DelegateTool events will continue to use
-        DelegateTool to maintain backward compatibility.
-    """
-    task_tool_name = DelegateTool.name if use_delegate_tool else TaskToolSet.name
+def get_default_cli_tools() -> list[Tool]:
+    """Get the default tool specifications for CLI mode (browser disabled)."""
     return [
         Tool(name=TerminalTool.name),
         Tool(name=FileEditorTool.name),
         Tool(name=TaskTrackerTool.name),
-        Tool(name=task_tool_name),
+        Tool(name=TaskToolSet.name),
     ]
 
 
@@ -231,39 +181,3 @@ def create_seeded_instructions_from_args(args: Namespace) -> list[str] | None:
         return [args.task]
 
     return None
-
-
-def extract_text_from_message_content(
-    message_content: list[TextContent | ImageContent], has_exactly_one: bool = True
-) -> str | None:
-    """Extract text from message content for slash command detection.
-
-    Args:
-        message_content: Message content (typically a list of content blocks)
-
-    Returns:
-        The text content of first TextContent block, None otherwise
-    """
-
-    if len(message_content) == 0:
-        return None
-
-    if has_exactly_one and len(message_content) != 1:
-        return None
-
-    # Only accept single TextContent blocks for slash commands
-    if not isinstance(message_content[0], TextContent):
-        return None
-
-    # Use SDK utility to extract text - content_to_str handles the conversion
-    return message_content[0].text
-
-
-def json_callback(event: Event) -> None:
-    if isinstance(event, SystemPromptEvent):
-        return
-
-    data = event.model_dump()
-    pretty_json = json.dumps(data, indent=2, sort_keys=True)
-    print("--JSON Event--")
-    print(pretty_json)

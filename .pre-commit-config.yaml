@@ -36,5 +36,6 @@ repos:
             args: [run, --frozen, pyright]
             language: system
             types: [python]
+            files: ^openhands_cli/
             pass_filenames: true
             always_run: false

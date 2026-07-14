@@ -3,7 +3,6 @@ from __future__ import annotations
 
 import json
 import os
-import re
 from typing import Any
 
 from pydantic import BaseModel, SecretStr
@@ -18,10 +17,7 @@ from openhands.sdk import (
 )
 from openhands.sdk.context import load_project_skills
 from openhands.sdk.conversation.persistence_const import BASE_STATE
-from openhands.sdk.critic.base import CriticBase
-from openhands.sdk.critic.impl.api import APIBasedCritic
 from openhands.sdk.tool import Tool
-from openhands_cli.deprecated_utils import conversation_has_delegate_tool
 from openhands_cli.locations import (
     AGENT_SETTINGS_PATH,
     get_conversations_dir,
@@ -29,7 +25,6 @@ from openhands_cli.locations import (
     get_work_dir,
 )
 from openhands_cli.mcp.mcp_utils import list_enabled_servers
-from openhands_cli.stores.cli_settings import CliSettings
 from openhands_cli.utils import (
     get_default_cli_agent,
     get_default_cli_tools,
@@ -81,48 +76,6 @@ def get_persisted_conversation_tools(conversation_id: str) -> list[Tool] | None:
         # Convert tool data to Tool objects
         return [Tool.model_validate(tool) for tool in tools_data]
     except (json.JSONDecodeError, KeyError, OSError):
-        return None
-
-
-def get_default_critic(llm: LLM, *, enable_critic: bool = True) -> CriticBase | None:
-    """Auto-configure critic for All-Hands LLM proxy.
-
-    When the LLM base_url matches `llm-proxy.*.all-hands.dev`, returns an
-    APIBasedCritic configured with:
-    - server_url: {base_url}/vllm
-    - api_key: same as LLM
-    - model_name: "critic"
-
-    Returns None if base_url doesn't match, api_key is not set, or enable_critic
-    is False.
-
-    Args:
-        llm: The LLM configuration
-        enable_critic: Whether critic feature is enabled (from settings)
-    """
-    # Check if critic is enabled in settings
-    if not enable_critic:
-        return None
-
-    base_url = llm.base_url
-    api_key = llm.api_key
-    if base_url is None or api_key is None:
-        return None
-
-    # Match: llm-proxy.{env}.all-hands.dev (e.g., staging, prod, eval, app)
-    pattern = r"^https?://llm-proxy\.[^./]+\.all-hands\.dev"
-    if not re.match(pattern, base_url):
-        return None
-
-    try:
-        return APIBasedCritic(
-            server_url=f"{base_url.rstrip('/')}/vllm",
-            api_key=api_key,
-            model_name="critic",
-        )
-    except Exception:
-        # If critic creation fails, silently return None
-        # This allows the CLI to continue working without critic
         return None
 
 
@@ -318,7 +271,6 @@ class AgentStore:
         session_id: str | None = None,
         *,
         env_overrides_enabled: bool = False,
-        critic_disabled: bool = False,
     ) -> Agent | None:
         """Load an Agent and apply runtime configuration.
 
@@ -331,14 +283,13 @@ class AgentStore:
                 a default Agent.
             * Otherwise, raise an error.
 
-        Runtime configuration (tools, context, MCP, metadata, critic) is
+        Runtime configuration (tools, context, MCP, metadata) is
         always applied last.
 
         Args:
             session_id: Optional session ID used for tool restoration and
                 LLM metadata tagging.
             env_overrides_enabled: Whether env overrides are enabled.
-            critic_disabled: If True, do not configure a critic.
 
         Returns:
             A fully configured Agent, or None if no persisted agent exists and
@@ -359,23 +310,17 @@ class AgentStore:
         if agent is None:
             return None
 
-        # Apply runtime configuration (tools, context, MCP, condenser, critic)
+        # Apply runtime configuration (tools, context, MCP, condenser)
         return self._apply_runtime_config(
             agent,
             session_id,
-            critic_disabled=critic_disabled,
         )
 
     def _resolve_tools(self, session_id: str | None) -> list[Tool]:
-        """Resolve tools for a conversation, with backward compatibility.
+        """Resolve tools for a conversation.
 
-        For persisted conversations:
-        1. First try to load tools from base_state.json
-        2. If not available, check if the conversation has DelegateTool events
-           and use DelegateTool for backward compatibility
-
-        For new conversations:
-        - Use TaskToolSet (the default for new conversations)
+        For persisted conversations, load tools from base_state.json when
+        available; otherwise fall back to the default CLI tool set.
         """
         if not session_id:
             return get_default_cli_tools()
@@ -383,9 +328,7 @@ class AgentStore:
         if tools := get_persisted_conversation_tools(session_id):
             return tools
 
-        # Check if conversation's SystemPromptEvent lists DelegateTool
-        use_delegate = conversation_has_delegate_tool(session_id)
-        return get_default_cli_tools(use_delegate_tool=use_delegate)
+        return get_default_cli_tools()
 
     def _with_llm_metadata(
         self, llm: LLM, *, session_id: str | None, llm_type: str
@@ -437,8 +380,6 @@ class AgentStore:
         self,
         agent: Agent,
         session_id: str | None = None,
-        *,
-        critic_disabled: bool = False,
     ) -> Agent:
         updated_tools = self._resolve_tools(session_id)
         updated_llm = self._with_llm_metadata(
@@ -452,13 +393,6 @@ class AgentStore:
 
         condenser = self._maybe_build_condenser(agent, session_id=session_id)
 
-        critic = None
-        if not critic_disabled:
-            cli_settings = CliSettings.load()
-            critic = get_default_critic(
-                updated_llm, enable_critic=cli_settings.critic.enable_critic
-            )
-
         return agent.model_copy(
             update={
                 "llm": updated_llm,
@@ -466,7 +400,6 @@ class AgentStore:
                 "mcp_config": mcp_config,
                 "agent_context": agent_context,
                 "condenser": condenser,
-                "critic": critic,
             }
         )
 
@@ -514,18 +447,9 @@ class AgentStore:
             tools=get_default_cli_tools(),
             mcp_config={},
             condenser=condenser,
-            # Note: critic is NOT included here - it will be derived on-the-fly
         )
 
-        # Save the agent configuration (without critic)
+        # Save the agent configuration
         self.save(agent)
-
-        # Now add critic on-the-fly for the returned agent (not persisted)
-        cli_settings = CliSettings.load()
-        critic = get_default_critic(
-            llm, enable_critic=cli_settings.critic.enable_critic
-        )
-        if critic is not None:
-            agent = agent.model_copy(update={"critic": critic})
 
         return agent

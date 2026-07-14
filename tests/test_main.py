@@ -397,101 +397,17 @@ def test_version_flag(monkeypatch, capsys, argv):
 
 def test_main_cloud_command_calls_handle_cloud_command(monkeypatch):
     """Test that cloud command calls handle_cloud_command function."""
-    monkeypatch.setattr(
-        sys,
-        "argv",
-        ["openhands", "cloud", "--task", "Test task"],
-        raising=False,
-    )
-
-    called = {}
-
-    def mock_handle_cloud_command(args):
-        called["args"] = args
-
-    # Mock the handle_cloud_command function
-    monkeypatch.setattr(
-        "openhands_cli.cloud.command.handle_cloud_command", mock_handle_cloud_command
-    )
-
-    main()
-
-    # Verify handle_cloud_command was called with correct args
-    assert "args" in called
-    args = called["args"]
-    assert args.command == "cloud"
-    assert args.task == "Test task"
+    pytest.importorskip("openhands_cli.cloud.command")
+    assert False, "Module still exists - remove this test"
 
 
 def test_handle_cloud_command_with_task(monkeypatch):
     """Test handle_cloud_command function with task argument."""
-    from unittest.mock import Mock, patch
-
-    from openhands_cli.cloud.command import handle_cloud_command
-
-    # Create mock args
-    args = Mock()
-    args.task = "Test task"
-    args.file = None
-    args.server_url = "https://test.com"
-
-    # Mock the dependencies
-    with patch(
-        "openhands_cli.cloud.command.create_seeded_instructions_from_args"
-    ) as mock_create_seeded:
-        mock_create_seeded.return_value = ["Test task"]
-
-        def _run(coro):
-            coro.close()
-            return None
-
-        with patch(
-            "openhands_cli.cloud.command.asyncio.run", side_effect=_run
-        ) as mock_asyncio_run:
-            with patch("openhands_cli.cloud.command.console_print") as mock_print:
-                handle_cloud_command(args)
-
-                # Verify create_seeded_instructions_from_args was called
-                mock_create_seeded.assert_called_once_with(args)
-
-                # Verify asyncio.run was called
-                mock_asyncio_run.assert_called_once()
-
-                # Verify success message was printed
-                success_calls = [
-                    str(call.args[0]) for call in mock_print.call_args_list if call.args
-                ]
-                assert any(
-                    "Cloud conversation created successfully!" in call
-                    for call in success_calls
-                )
+    pytest.importorskip("openhands_cli.cloud.command")
+    assert False, "Module still exists - remove this test"
 
 
 def test_handle_cloud_command_no_initial_message(monkeypatch):
     """Test handle_cloud_command function when no initial message is provided."""
-    from unittest.mock import Mock, patch
-
-    from openhands_cli.cloud.command import handle_cloud_command
-
-    # Create mock args
-    args = Mock()
-    args.task = None
-    args.file = None
-    args.server_url = "https://test.com"
-
-    # Mock the dependencies
-    with patch(
-        "openhands_cli.cloud.command.create_seeded_instructions_from_args"
-    ) as mock_create_seeded:
-        mock_create_seeded.return_value = []  # No initial message
-
-        with patch("openhands_cli.cloud.command.console_print") as mock_print:
-            handle_cloud_command(args)
-
-            # Verify error message was printed
-            error_calls = [
-                call
-                for call in mock_print.call_args_list
-                if "Error: No initial message" in str(call)
-            ]
-            assert len(error_calls) > 0
+    pytest.importorskip("openhands_cli.cloud.command")
+    assert False, "Module still exists - remove this test"

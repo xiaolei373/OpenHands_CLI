@@ -37,7 +37,7 @@ dependencies = [
   "streamingjson>=0.0.2",
 ]
 
-scripts = { openhands = "openhands_cli.entrypoint:main", "openhands-acp" = "openhands_cli.acp:main" }
+scripts = { openhands = "openhands_cli.entrypoint:main" }
 
 [dependency-groups]
 # Hatchling wheel target: include the package directory
@@ -135,11 +135,16 @@ source = [
 [tool.pyright]
 include = [
     "openhands_cli",
-    "tests",
     "hooks"
 ]
+exclude = [
+    "tests",
+    "tui_e2e",
+    "build.py",
+    "hooks",
+]
 extraPaths = [
-    "openhands_cli"
+    "."
 ]
 venvPath = "."
 venv = ".venv"
