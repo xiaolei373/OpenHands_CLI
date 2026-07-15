@@ -54,9 +54,8 @@ def create_main_parser() -> argparse.ArgumentParser:
         help="Conversation ID to resume",
     )
 
-    # Confirmation mode options (mutually exclusive)
-    confirmation_group = parser.add_mutually_exclusive_group()
-    add_confirmation_mode_args(confirmation_group)
+    # Confirmation mode option
+    add_confirmation_mode_args(parser)
 
     # Environment variable override option
     add_env_override_args(parser)

@@ -75,6 +75,7 @@ def run_headless(
         confirmation_policy=policy,
         visualizer=DefaultConversationVisualizer,
         env_overrides_enabled=env_overrides_enabled,
+        enable_security_analyzer=llm_approve,
     )
 
     console.print("Agent is working", style="#ffffff")

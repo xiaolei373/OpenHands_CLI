@@ -81,10 +81,13 @@ def main() -> None:
         sys.exit(1)
     except Exception as e:
         console.print(f"Error: {str(e)}", style="#ff6b6b", markup=False)
-        import traceback
+        # Only dump the full traceback in debug mode; otherwise the concise
+        # message above is enough and we avoid printing the stack twice.
+        if os.getenv("DEBUG", "false").lower() in ("1", "true"):
+            import traceback
 
-        traceback.print_exc()
-        raise
+            traceback.print_exc()
+        sys.exit(1)
 
 
 if __name__ == "__main__":

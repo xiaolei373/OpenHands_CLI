@@ -1,3 +1,4 @@
+import os
 from collections.abc import Callable
 from typing import Any
 from uuid import UUID
@@ -98,6 +99,7 @@ def setup_conversation(
     console: Console | None = None,
     *,
     env_overrides_enabled: bool = False,
+    enable_security_analyzer: bool = False,
 ) -> BaseConversation:
     """
     Setup the conversation with agent.
@@ -112,6 +114,11 @@ def setup_conversation(
         env_overrides_enabled: If True, environment variables will override
             stored LLM settings, and agent can be created from env vars if no
             disk config exists.
+        enable_security_analyzer: If True, attach an LLMSecurityAnalyzer so the
+            agent must self-assess per-action risk. Only meaningful when the
+            confirmation policy actually gates on risk (e.g. --llm-approve).
+            Enabling it under auto-approve forces the model to emit a
+            ``security_risk`` field on every tool call for no benefit.
 
     Raises:
         MissingAgentSpec: If agent specification is not found or invalid.
@@ -139,6 +146,14 @@ def setup_conversation(
     if not hook_config.is_empty():
         console.print("✓ Hooks loaded", style="green")
 
+    # Cap agent iterations per run (guards against runaway loops in headless
+    # mode). Configurable via OPENHANDS_MAX_ITERATIONS; falls back to a bounded
+    # default. Stuck detection remains enabled by the SDK default.
+    try:
+        max_iterations = int(os.environ.get("OPENHANDS_MAX_ITERATIONS", "500"))
+    except ValueError:
+        max_iterations = 500
+
     # Create conversation - agent context is now set in AgentStore.load()
     conversation: BaseConversation = Conversation(
         agent=agent,
@@ -149,9 +164,15 @@ def setup_conversation(
         visualizer=visualizer,
         callbacks=callbacks,
         hook_config=hook_config,
+        max_iteration_per_run=max_iterations,
     )
 
-    # conversation.set_security_analyzer(LLMSecurityAnalyzer())
+    # Only attach the LLM security analyzer when the confirmation policy will
+    # actually act on the risk (e.g. --llm-approve). Attaching it under
+    # auto-approve forces every tool call to carry a security_risk field and
+    # breaks models that don't emit it.
+    if enable_security_analyzer:
+        conversation.set_security_analyzer(LLMSecurityAnalyzer())
     conversation.set_confirmation_policy(confirmation_policy)
 
     console.print(f"✓ Agent initialized with model: {agent.llm.model}", style="green")

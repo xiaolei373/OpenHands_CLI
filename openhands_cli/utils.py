@@ -83,7 +83,7 @@ def get_llm_metadata(
 
     Args:
         model_name: Name of the LLM model
-        agent_name: Name of the agent (defaults to "openhands")
+        llm_type: Category of the LLM usage (e.g. "agent", "condenser")
         session_id: Optional session identifier
         user_id: Optional user identifier
 
@@ -151,9 +151,6 @@ def create_seeded_instructions_from_args(args: Namespace) -> list[str] | None:
     """
     Build initial CLI input(s) from parsed arguments.
     """
-    if getattr(args, "command", None) == "serve":
-        return None
-
     # --file takes precedence over --task
     if getattr(args, "file", None):
         path = Path(args.file).expanduser()

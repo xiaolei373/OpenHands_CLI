@@ -407,6 +407,14 @@ class AgentStore:
         serialized_spec = agent.model_dump_json(context={"expose_secrets": True})
         self.file_store.write(AGENT_SETTINGS_PATH, serialized_spec)
 
+        # The agent spec contains the LLM API key in plaintext; restrict the
+        # file to the owner. Best-effort: silently ignore platforms/filesystems
+        # that don't support POSIX permissions (e.g. Windows).
+        try:
+            os.chmod(os.path.join(get_persistence_dir(), AGENT_SETTINGS_PATH), 0o600)
+        except OSError:
+            pass
+
     def create_and_save_from_settings(
         self,
         llm_api_key: str,

@@ -10,17 +10,12 @@ def add_confirmation_mode_args(
         parser_or_group: Either an ArgumentParser or a mutually exclusive group
     """
     parser_or_group.add_argument(
-        "--always-approve",
-        "--yolo",
-        action="store_true",
-        help="Auto-approve all actions without asking for confirmation",
-    )
-    parser_or_group.add_argument(
         "--llm-approve",
         action="store_true",
         help=(
             "Enable LLM-based security analyzer "
-            "(only confirm LLM-predicted high-risk actions)"
+            "(only confirm LLM-predicted high-risk actions). "
+            "Without this flag, all actions are auto-approved."
         ),
     )
 
