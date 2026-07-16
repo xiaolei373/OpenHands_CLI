@@ -12,7 +12,6 @@ from rich.panel import Panel
 from rich.rule import Rule
 
 from openhands.sdk import Message, TextContent
-from openhands.sdk.conversation.visualizer import DefaultConversationVisualizer
 from openhands.sdk.security.confirmation_policy import (
     ConfirmationPolicyBase,
     ConfirmRisky,
@@ -46,7 +45,7 @@ def _print_summary(conversation) -> None:
     console.print(Panel(last_agent_message, border_style="#277dff"))
 
 
-def run_headless(
+def run_task(
     task: str,
     resume_id: str | None = None,
     *,
@@ -73,7 +72,8 @@ def run_headless(
     conversation = setup_conversation(
         conversation_id,
         confirmation_policy=policy,
-        visualizer=DefaultConversationVisualizer,
+        # visualizer=DefaultConversationVisualizer,
+        visualizer=None,
         env_overrides_enabled=env_overrides_enabled,
         enable_security_analyzer=llm_approve,
     )

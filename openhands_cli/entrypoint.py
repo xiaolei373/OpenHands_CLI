@@ -56,9 +56,9 @@ def main() -> None:
         check_and_warn_env_vars()
 
     try:
-        from openhands_cli.headless_runner import run_headless
+        from openhands_cli.task_runner import run_task
 
-        conversation_id = run_headless(
+        conversation_id = run_task(
             task,
             resume_id=args.resume,
             llm_approve=args.llm_approve,
