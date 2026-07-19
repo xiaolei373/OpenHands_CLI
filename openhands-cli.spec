@@ -38,6 +38,9 @@ a = Analysis(
         *collect_data_files('browser_use'),
         # Include all data files from openhands_cli package
         *collect_data_files('openhands_cli'),
+        # Bundle the vendored public skills tree (SKILL.md, references, and
+        # helper scripts) so they ship with the binary and load in any cwd.
+        (str(project_root / 'openhands_cli' / 'skills'), 'openhands_cli/skills'),
         # Include package metadata for importlib.metadata
         *copy_metadata('fastmcp'),
         *copy_metadata('agent-client-protocol'),

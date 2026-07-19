@@ -70,7 +70,7 @@ class TestSkillsLoading:
         # Verify that project skills were loaded into the agent context
         # Should have exactly 3 project skills from .agents/skills
         # Plus any user skills that might be loaded via load_user_skills=True
-        # Plus public skills from the GitHub repository
+        # (public skills are bundled in openhands_cli/skills and merged in too)
         all_skills = loaded_agent.agent_context.skills
         assert isinstance(all_skills, list)
         # Should have at least the 3 project skills
@@ -127,7 +127,7 @@ This is a user microagent for testing.
 
             # Project skills: 3
             # User skills: 2
-            # Public skills: loaded from GitHub repository (variable count)
+            # (public skills are bundled in openhands_cli/skills and merged in)
             all_skills = loaded_agent.agent_context.skills
             assert isinstance(all_skills, list)
             # Should have at least project + user skills (5)
@@ -144,11 +144,12 @@ This is a user microagent for testing.
     def test_build_agent_context_enables_sdk_managed_skill_loading(
         self, temp_project_dir
     ):
-        """Test that AgentStore enables SDK-managed user and public skill loading.
+        """Test that AgentStore enables SDK-managed user skill loading.
 
         This verifies the CLI-specific contract: AgentStore builds an AgentContext
-        with project skills plus the flags that tell the SDK to auto-load user and
-        public skills.
+        with project skills plus the flag that tells the SDK to auto-load user
+        skills, while remote public-skill loading is disabled (public skills are
+        vendored into openhands_cli/skills instead).
         """
         from openhands_cli.stores import AgentStore
 
@@ -161,6 +162,10 @@ This is a user microagent for testing.
 
         with (
             patch("openhands_cli.stores.agent_store.AgentContext", FakeAgentContext),
+            patch(
+                "openhands_cli.stores.agent_store._load_bundled_skills",
+                return_value=[],
+            ),
             patch(
                 "openhands_cli.stores.agent_store.get_work_dir",
                 return_value=temp_project_dir,
@@ -175,7 +180,9 @@ This is a user microagent for testing.
 
         assert isinstance(agent_context, FakeAgentContext)
         assert agent_context.load_user_skills is True
-        assert agent_context.load_public_skills is True
+        # Public skills are vendored into openhands_cli/skills and loaded via
+        # _load_bundled_skills, so SDK remote public-skill loading is disabled.
+        assert agent_context.load_public_skills is False
 
         skill_names = [skill.name for skill in agent_context.skills]
         assert "test_skill" in skill_names
@@ -185,3 +192,38 @@ This is a user microagent for testing.
             f"Your current working directory is: {temp_project_dir}\n"
             "User operating system: TestOS 1.0"
         )
+
+    def test_build_agent_context_includes_bundled_public_skills(self, temp_project_dir):
+        """Bundled public skills are merged into the agent context.
+
+        The 55 vendored public skills live in openhands_cli/skills and must be
+        loaded regardless of the working directory (they ship with the package),
+        alongside the user's project skills.
+        """
+        from openhands_cli.stores import AgentStore
+        from openhands_cli.stores.agent_store import _load_bundled_skills
+
+        bundled = _load_bundled_skills()
+        bundled_names = {skill.name for skill in bundled}
+        # Sanity check that the vendored skills are present and discoverable.
+        assert len(bundled) > 0
+        assert "code-review" in bundled_names
+        assert "security" in bundled_names
+
+        with (
+            patch(
+                "openhands_cli.stores.agent_store.get_work_dir",
+                return_value=temp_project_dir,
+            ),
+            patch(
+                "openhands_cli.stores.agent_store.get_os_description",
+                return_value="TestOS 1.0",
+            ),
+        ):
+            agent_context = AgentStore()._build_agent_context()
+
+        skill_names = {skill.name for skill in agent_context.skills}
+        # Both project skills and bundled public skills are present.
+        assert "test_skill" in skill_names
+        assert bundled_names <= skill_names
+        assert agent_context.load_public_skills is False

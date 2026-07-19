@@ -75,6 +75,11 @@ packages = [ "openhands_cli" ]
 [tool.ruff]
 target-version = "py312"
 line-length = 88
+# Vendored public skills (openhands_cli/skills) are third-party content shipped
+# as data; do not lint or reformat them. force-exclude makes the exclusion apply
+# even when files are passed explicitly (e.g. by pre-commit).
+extend-exclude = ["openhands_cli/skills"]
+force-exclude = true
 
 [tool.ruff.format]
 quote-style = "double"
@@ -142,6 +147,7 @@ exclude = [
     "tui_e2e",
     "build.py",
     "hooks",
+    "openhands_cli/skills",
 ]
 extraPaths = [
     "."

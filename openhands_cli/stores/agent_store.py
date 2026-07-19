@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import json
 import os
+from pathlib import Path
 from typing import Any
 
 from pydantic import BaseModel, SecretStr
@@ -15,8 +16,9 @@ from openhands.sdk import (
     LLMSummarizingCondenser,
     LocalFileStore,
 )
-from openhands.sdk.context import load_project_skills
+from openhands.sdk.context import load_project_skills, load_skills_from_dir
 from openhands.sdk.conversation.persistence_const import BASE_STATE
+from openhands.sdk.skills import Skill
 from openhands.sdk.tool import Tool
 from openhands_cli.locations import (
     AGENT_SETTINGS_PATH,
@@ -36,6 +38,29 @@ from openhands_cli.utils import (
 
 console = Console(highlight=False, soft_wrap=True)
 stderr_console = Console(stderr=True, highlight=False, soft_wrap=True)
+
+# Public skills vendored into the package so they ship with the CLI and load
+# regardless of the runtime working directory. Located at openhands_cli/skills/.
+BUNDLED_SKILLS_DIR = Path(__file__).resolve().parent.parent / "skills"
+
+
+def _load_bundled_skills() -> list[Skill]:
+    """Load skills bundled inside the openhands_cli package.
+
+    These are pinned copies of the OpenHands public skills. Loading them here
+    (instead of relying on load_public_skills) keeps them under version control
+    and available offline, in any working directory.
+    """
+    if not BUNDLED_SKILLS_DIR.is_dir():
+        return []
+
+    repo_skills, knowledge_skills, agent_skills = load_skills_from_dir(
+        BUNDLED_SKILLS_DIR
+    )
+    merged: dict[str, Skill] = {}
+    for skills_dict in (repo_skills, knowledge_skills, agent_skills):
+        merged.update(skills_dict)
+    return list(merged.values())
 
 
 def get_persisted_conversation_tools(conversation_id: str) -> list[Tool] | None:
@@ -348,7 +373,16 @@ class AgentStore:
         )
 
     def _build_agent_context(self) -> AgentContext:
+        # Skills from the user's working directory (their project rules) plus the
+        # public skills vendored into this package. Project skills win on name
+        # collisions so a user can override a bundled skill locally.
         skills = load_project_skills(get_work_dir())
+        seen = {skill.name for skill in skills}
+        for skill in _load_bundled_skills():
+            if skill.name not in seen:
+                skills.append(skill)
+                seen.add(skill.name)
+
         system_suffix = "\n".join(
             [
                 f"Your current working directory is: {get_work_dir()}",
@@ -359,7 +393,10 @@ class AgentStore:
             skills=skills,
             system_message_suffix=system_suffix,
             load_user_skills=True,
-            load_public_skills=True,
+            # Public skills are vendored into openhands_cli/skills and loaded via
+            # _load_bundled_skills above, so they stay pinned and under version
+            # control instead of being pulled from the remote repository.
+            load_public_skills=False,
         )
 
     def _maybe_build_condenser(
