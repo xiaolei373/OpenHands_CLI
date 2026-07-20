@@ -150,7 +150,12 @@ exclude = [
     "openhands_cli/skills",
 ]
 extraPaths = [
-    "."
+    ".",
+    # Vendored SDK/tools are installed via a setuptools strict-editable finder
+    # that static analyzers can't follow; point pyright at the real source roots
+    # so `import openhands.sdk` / `openhands.tools` resolves.
+    "vendor/openhands-sdk",
+    "vendor/openhands-tools",
 ]
 venvPath = "."
 venv = ".venv"
