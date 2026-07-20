@@ -1,6 +1,7 @@
 from collections.abc import Sequence
 
 from openhands.sdk.event.base import LLMConvertibleEvent
+from openhands.sdk.event.llm_convertible.system import SystemPromptEvent
 from openhands.sdk.llm import LLM
 
 
@@ -35,7 +36,15 @@ def get_total_token_count(
         >>> print(f"Total tokens: {token_count}")
     """
     messages = LLMConvertibleEvent.events_to_messages(list(events))
-    return llm.get_token_count(messages)
+    tools = next(
+        (event.tools for event in events if isinstance(event, SystemPromptEvent)),
+        None,
+    )
+    return llm.get_token_count(
+        messages,
+        tools=tools or None,
+        add_security_risk_prediction=bool(tools),
+    )
 
 
 def get_shortest_prefix_above_token_count(

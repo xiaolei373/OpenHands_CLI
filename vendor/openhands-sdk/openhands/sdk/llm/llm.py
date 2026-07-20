@@ -551,8 +551,78 @@ class LLM(BaseModel, RetryMixin, NonNativeToolCallingMixin):
             )
 
         # Tokenizer
-        if self.custom_tokenizer:
-            self._tokenizer = create_pretrained_tokenizer(self.custom_tokenizer)
+        if self.custom_tokenizer and self._tokenizer is None:
+            try:
+                if self.custom_tokenizer.startswith(("http://", "https://")):
+                    import hashlib, urllib.request
+                    # 1) 本地缓存路径
+                    cache_dir = os.path.expanduser("~/.cache/openhands/tokenizers")
+                    os.makedirs(cache_dir, exist_ok=True)
+                    key = hashlib.md5(self.custom_tokenizer.encode()).hexdigest()
+                    cache_file = os.path.join(cache_dir, f"{key}.json")
+
+                    # 2) 命中缓存先校验,坏缓存自愈(删除后走重新下载)
+                    if os.path.exists(cache_file):
+                        try:
+                            with open(cache_file, "r", encoding="utf-8") as f:
+                                tokenizer_json = f.read()
+                            self._tokenizer = create_tokenizer(tokenizer_json)
+                            logger.debug(
+                                f"Custom tokenizer loaded from cache: {cache_file}"
+                            )
+                        except Exception as e:
+                            self._tokenizer = None
+                            logger.debug(
+                                f"Cached tokenizer at {cache_file} is invalid "
+                                f"({e!r}); removing and re-downloading."
+                            )
+                            try:
+                                os.remove(cache_file)
+                            except OSError:
+                                pass
+
+                    # 3) 无缓存或缓存损坏:重试下载 -> 先校验 -> 原子落盘
+                    if self._tokenizer is None:
+                        logger.debug(
+                            f"Downloading custom tokenizer from {self.custom_tokenizer}"
+                        )
+                        last_err = None
+                        for attempt in range(6):
+                            try:
+                                with urllib.request.urlopen(self.custom_tokenizer, timeout=30) as resp:
+                                    tokenizer_json = resp.read().decode("utf-8")
+                                # 先构造校验,确认是合法 tokenizer 再落盘,避免缓存投毒
+                                self._tokenizer = create_tokenizer(tokenizer_json)
+                                tmp = f"{cache_file}.{os.getpid()}.tmp"
+                                with open(tmp, "w", encoding="utf-8") as f:
+                                    f.write(tokenizer_json)
+                                os.replace(tmp, cache_file)  # 原子替换,防并发/半截文件
+                                logger.debug(
+                                    f"Custom tokenizer downloaded and cached to "
+                                    f"{cache_file} (attempt {attempt + 1})"
+                                )
+                                break
+                            except Exception as e:
+                                last_err = e
+                                logger.debug(
+                                    f"Tokenizer download attempt {attempt + 1}/6 failed "
+                                    f"for {self.custom_tokenizer}: {e!r}"
+                                )
+                                if attempt < 5:
+                                    time.sleep(2 * (attempt + 1))
+                        else:
+                            raise last_err
+
+                    logger.debug("Custom tokenizer loaded from URL (cached).")
+                else:
+                    self._tokenizer = create_pretrained_tokenizer(self.custom_tokenizer)
+            except Exception as e:
+                self._tokenizer = None
+                logger.debug(
+                    f"Failed to load custom_tokenizer={self.custom_tokenizer!r}: {e}. "
+                    f"Falling back to litellm default tokenizer.",
+                    exc_info=True,
+                )
 
         # Capabilities + model info
         self._init_model_info_and_caps()
@@ -1499,19 +1569,43 @@ class LLM(BaseModel, RetryMixin, NonNativeToolCallingMixin):
             return transform_for_subscription(system_chunks, input_items)
         return instructions, input_items
 
-    def get_token_count(self, messages: list[Message]) -> int:
+    def get_token_count(
+        self,
+        messages: list[Message],
+        tools: Sequence[ToolDefinition] | None = None,
+        add_security_risk_prediction: bool = False,
+    ) -> int:
         logger.debug(
             "Message objects now include serialized tool calls in token counting"
         )
         formatted_messages = self.format_messages_for_llm(messages)
+        cc_tools = [
+            tool.to_openai_tool(
+                add_security_risk_prediction=add_security_risk_prediction,
+            )
+            for tool in tools or []
+        ]
+        use_mock_tools = self.should_mock_tool_calls(cc_tools)
+        if use_mock_tools:
+            tool_call_state: dict[str, Any] = {}
+            formatted_messages, _ = self.pre_request_prompt_mock(
+                formatted_messages,
+                cc_tools,
+                tool_call_state,
+                include_security_params=add_security_risk_prediction,
+            )
+            cc_tools = []
         try:
-            return int(
+            n= int(
                 token_counter(
                     model=self.model,
                     messages=formatted_messages,
+                    tools=cc_tools or None,
                     custom_tokenizer=self._tokenizer,
                 )
             )
+            logger.debug(f"custom tokenizer={self.custom_tokenizer or 'default'}, token count: {n}")
+            return n
         except Exception as e:
             logger.error(
                 f"Error getting token count for model {self.model}\n{e}"
