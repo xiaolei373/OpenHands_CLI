@@ -107,6 +107,39 @@ review those changes in this repo's CR flow, and compile them into the binary.
 pins in the root `pyproject.toml` must stay in sync (both currently `1.19.1`).
 Changing one without the other makes `uv sync` unsatisfiable.
 
+## Change Workflow (MUST)
+
+Every **non-trivial** change (logic, dependencies, `openhands-cli.spec`, public
+behavior/interface, or anything under `vendor/`) MUST go through this flow. Trivial
+changes (pure formatting, typo, comments) are exempt.
+
+For each such change, work through these four questions **in order** and record the
+answers in a change record (see below):
+
+1. **背景 / Background** — why is this change needed? What breaks or is missing if we
+   don't do it?
+2. **影响范围 / Scope of impact** — which files/modules change; does observable
+   behavior, an interface, or a data format change; does it touch the vendored SDK or
+   other callers?
+3. **如何验证 / How to verify** — run, don't assume. At minimum `make lint` + `make
+   test`; if you touched packaging/binary/`vendor/`/`mcp/`/entrypoint, also `./build.sh`
+   then `./dist/openhands --help` **and** a real task (confirm no `ModuleNotFoundError`
+   / missing `.j2` data files). Record the exact commands and their results.
+4. **是否需要改 spec / Spec impact** — decide explicitly whether `openhands-cli.spec`
+   needs updating. It does when you add a **runtime dependency**, a **data file**
+   (`.j2`/`.md`/`.js`/templates/metadata), or a **dynamic import** static analysis
+   can't follow (add to `hiddenimports` / `datas` / `copy_metadata` / `pathex`). If you
+   change the spec, re-verify per step 3.
+
+### Recording the change (for traceability)
+
+- Copy `docs/changes/_TEMPLATE.md` to `docs/changes/YYYY-MM-DD-<slug>.md` and fill in the
+  four sections above plus risk/rollback.
+- One logical change = one record file. Commit the record **together with** the code
+  change (same commit/review), so code and rationale never drift apart.
+- Rationale that git log doesn't capture (background, impact judgement, verification
+  evidence, spec decision) lives here; see `docs/changes/README.md`.
+
 ## Development Guidelines
 
 ### Linting Requirements
