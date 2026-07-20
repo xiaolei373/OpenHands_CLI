@@ -3,7 +3,7 @@ revision = 3
 requires-python = "==3.12.*"
 
 [options]
-exclude-newer = "0001-01-01T00:00:00Z" # This has no effect and is included for backwards compatibility when using relative exclude-newer values.
+exclude-newer = "2026-07-13T03:34:42.073536405Z"
 exclude-newer-span = "P7D"
 
 [options.exclude-newer-package]
@@ -1732,8 +1732,8 @@ dev = [
 requires-dist = [
     { name = "agent-client-protocol", specifier = ">=0.8.1,<0.9.0" },
     { name = "httpx", specifier = ">=0.25.0" },
-    { name = "openhands-sdk", specifier = "==1.19.1" },
-    { name = "openhands-tools", specifier = "==1.19.1" },
+    { name = "openhands-sdk", editable = "vendor/openhands-sdk" },
+    { name = "openhands-tools", editable = "vendor/openhands-tools" },
     { name = "openhands-workspace", specifier = "==1.11.1" },
     { name = "pydantic", specifier = ">=2.7" },
     { name = "pyperclip", specifier = ">=1.9.0" },
@@ -1791,7 +1791,7 @@ wheels = [
 [[package]]
 name = "openhands-sdk"
 version = "1.19.1"
-source = { registry = "https://pypi.org/simple" }
+source = { editable = "vendor/openhands-sdk" }
 dependencies = [
     { name = "agent-client-protocol" },
     { name = "deprecation" },
@@ -1807,15 +1807,30 @@ dependencies = [
     { name = "tenacity" },
     { name = "websockets" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/eb/d6/6785ee1485aa552ebab25ff3afe6e1fa460606bea0c6f089e1adefb1d849/openhands_sdk-1.19.1.tar.gz", hash = "sha256:1e9a758649ae516259c965778b891592c38e232de6bcab53036ba05f6fc53551", size = 410533, upload-time = "2026-04-30T17:06:49.432Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/ef/40/771077b17f429c42d916f913ef42fcf8a7f980112dffd3ef6bede3e6c7ff/openhands_sdk-1.19.1-py3-none-any.whl", hash = "sha256:fd2c7ed11663595f6131b5e1879f636ad1dd4d897490b582509c924ca238a150", size = 513989, upload-time = "2026-04-30T17:06:47.421Z" },
+
+[package.metadata]
+requires-dist = [
+    { name = "agent-client-protocol", specifier = ">=0.8.1" },
+    { name = "boto3", marker = "extra == 'boto3'", specifier = ">=1.35.0" },
+    { name = "deprecation", specifier = ">=2.1.0" },
+    { name = "fakeredis", extras = ["lua"], specifier = ">=2.32.1" },
+    { name = "fastmcp", specifier = ">=3.0.0" },
+    { name = "filelock", specifier = ">=3.20.1" },
+    { name = "httpx", extras = ["socks"], specifier = ">=0.27.0" },
+    { name = "litellm", specifier = ">=1.82.6,!=1.82.7,!=1.82.8" },
+    { name = "lmnr", specifier = ">=0.7.47" },
+    { name = "pydantic", specifier = ">=2.12.5" },
+    { name = "python-frontmatter", specifier = ">=1.1.0" },
+    { name = "python-json-logger", specifier = ">=3.3.0" },
+    { name = "tenacity", specifier = ">=9.1.2" },
+    { name = "websockets", specifier = ">=12" },
 ]
+provides-extras = ["boto3"]
 
 [[package]]
 name = "openhands-tools"
 version = "1.19.1"
-source = { registry = "https://pypi.org/simple" }
+source = { editable = "vendor/openhands-tools" }
 dependencies = [
     { name = "bashlex" },
     { name = "binaryornot" },
@@ -1827,9 +1842,18 @@ dependencies = [
     { name = "pydantic" },
     { name = "tom-swe" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/21/a8/84edceda6a3717e502b8932cffa823f3b3b7932701aa8606c92fc3d1049b/openhands_tools-1.19.1.tar.gz", hash = "sha256:0634a0e24e4fd87f05f902ff97e5cd30dd909d5cb2b137aae4470902f800f3db", size = 131629, upload-time = "2026-04-30T17:06:43.216Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/04/58/cc921dc110aab691b170fec788901cb502e78c460cc45f344cccb90fe1d4/openhands_tools-1.19.1-py3-none-any.whl", hash = "sha256:695b04399f8f7018aba937d4e0eb97c7caa0111538e9620b46871f5f62726c14", size = 175360, upload-time = "2026-04-30T17:06:45.085Z" },
+
+[package.metadata]
+requires-dist = [
+    { name = "bashlex", specifier = ">=0.18" },
+    { name = "binaryornot", specifier = ">=0.4.4" },
+    { name = "browser-use", specifier = ">=0.8.0" },
+    { name = "cachetools" },
+    { name = "func-timeout", specifier = ">=4.3.5" },
+    { name = "libtmux", specifier = ">=0.53.0" },
+    { name = "openhands-sdk" },
+    { name = "pydantic", specifier = ">=2.11.7" },
+    { name = "tom-swe", specifier = ">=1.0.3" },
 ]
 
 [[package]]

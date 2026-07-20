@@ -158,8 +158,9 @@ pythonVersion = "3.12"
 useLibraryCodeForTypes = true
 typeCheckingMode = "standard"
 
-# USE EXACT COMMIT FROM AGENT-SDK (PR #1368 - Add condense method to conversation class)
-
-# [tool.uv.sources]
-# openhands-sdk = { git = "https://github.com/OpenHands/software-agent-sdk.git", subdirectory = "openhands-sdk", rev = "c76e5bd220ea9eb95a9d351313bdb4e533c9da6e" }
-# openhands-tools = { git = "https://github.com/OpenHands/software-agent-sdk.git", subdirectory = "openhands-tools", rev = "c76e5bd220ea9eb95a9d351313bdb4e533c9da6e" }
+# Vendored SDK/tools source (pinned to upstream v1.19.1) lives under vendor/ and
+# is built as editable local packages. Team edits to the SDK are reviewed in this
+# repo's CR flow and get compiled into the PyInstaller binary via ./build.sh.
+[tool.uv.sources]
+openhands-sdk = { path = "vendor/openhands-sdk", editable = true }
+openhands-tools = { path = "vendor/openhands-tools", editable = true }

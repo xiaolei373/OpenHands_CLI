@@ -22,7 +22,15 @@ project_root = Path.cwd()
 
 a = Analysis(
     ['openhands_cli/entrypoint.py'],
-    pathex=[str(project_root)],
+    pathex=[
+        str(project_root),
+        # Vendored SDK/tools are installed as setuptools "strict" editable
+        # packages whose custom import finder PyInstaller cannot follow. Put the
+        # real source roots on the analysis path so openhands.sdk/openhands.tools
+        # are discovered and frozen as ordinary packages.
+        str(project_root / 'vendor' / 'openhands-sdk'),
+        str(project_root / 'vendor' / 'openhands-tools'),
+    ],
     binaries=[],
     datas=[
         # Include any data files that might be needed
