@@ -3,6 +3,7 @@ from __future__ import annotations
 import copy
 import json
 import os
+import time
 import warnings
 from collections.abc import Callable, Sequence
 from contextlib import contextmanager
@@ -73,6 +74,7 @@ from litellm.types.utils import (
 )
 from litellm.utils import (
     create_pretrained_tokenizer,
+    create_tokenizer,
     supports_vision,
     token_counter,
 )
@@ -554,7 +556,8 @@ class LLM(BaseModel, RetryMixin, NonNativeToolCallingMixin):
         if self.custom_tokenizer and self._tokenizer is None:
             try:
                 if self.custom_tokenizer.startswith(("http://", "https://")):
-                    import hashlib, urllib.request
+                    import hashlib
+                    import urllib.request
                     # 1) 本地缓存路径
                     cache_dir = os.path.expanduser("~/.cache/openhands/tokenizers")
                     os.makedirs(cache_dir, exist_ok=True)
@@ -564,7 +567,7 @@ class LLM(BaseModel, RetryMixin, NonNativeToolCallingMixin):
                     # 2) 命中缓存先校验,坏缓存自愈(删除后走重新下载)
                     if os.path.exists(cache_file):
                         try:
-                            with open(cache_file, "r", encoding="utf-8") as f:
+                            with open(cache_file, encoding="utf-8") as f:
                                 tokenizer_json = f.read()
                             self._tokenizer = create_tokenizer(tokenizer_json)
                             logger.debug(
@@ -589,7 +592,9 @@ class LLM(BaseModel, RetryMixin, NonNativeToolCallingMixin):
                         last_err = None
                         for attempt in range(6):
                             try:
-                                with urllib.request.urlopen(self.custom_tokenizer, timeout=30) as resp:
+                                with urllib.request.urlopen(
+                                    self.custom_tokenizer, timeout=30
+                                ) as resp:
                                     tokenizer_json = resp.read().decode("utf-8")
                                 # 先构造校验,确认是合法 tokenizer 再落盘,避免缓存投毒
                                 self._tokenizer = create_tokenizer(tokenizer_json)
@@ -605,8 +610,8 @@ class LLM(BaseModel, RetryMixin, NonNativeToolCallingMixin):
                             except Exception as e:
                                 last_err = e
                                 logger.debug(
-                                    f"Tokenizer download attempt {attempt + 1}/6 failed "
-                                    f"for {self.custom_tokenizer}: {e!r}"
+                                    f"Tokenizer download attempt {attempt + 1}/6 "
+                                    f"failed for {self.custom_tokenizer}: {e!r}"
                                 )
                                 if attempt < 5:
                                     time.sleep(2 * (attempt + 1))
@@ -1604,7 +1609,10 @@ class LLM(BaseModel, RetryMixin, NonNativeToolCallingMixin):
                     custom_tokenizer=self._tokenizer,
                 )
             )
-            logger.debug(f"custom tokenizer={self.custom_tokenizer or 'default'}, token count: {n}")
+            logger.debug(
+                f"custom tokenizer={self.custom_tokenizer or 'default'}, "
+                f"token count: {n}"
+            )
             return n
         except Exception as e:
             logger.error(
