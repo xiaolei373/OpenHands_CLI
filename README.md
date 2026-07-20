@@ -1,218 +1,130 @@
 <a name="readme-top"></a>
 
 <div align="center">
-  <img src="https://raw.githubusercontent.com/OpenHands/docs/main/openhands/static/img/logo.png" alt="Logo" width="200">
-  <h1 align="center">OpenHands V1 CLI</h1>
-  <h4>(Powered by <a href="https://github.com/OpenHands/software-agent-sdk">OpenHands Software Agent SDK</a>)</h4>
+  <h1>OpenHands CLI (Headless)</h1>
+  <p><i>A headless, single-task runner for the OpenHands agent — powered by a vendored <a href="https://github.com/OpenHands/software-agent-sdk">OpenHands Software Agent SDK</a>.</i></p>
 </div>
 
-
-<div align="center">
-  <a href="https://github.com/OpenHands/OpenHands-CLI/blob/main/LICENSE"><img src="https://img.shields.io/github/license/OpenHands/software-agent-sdk?style=for-the-badge&color=blue" alt="MIT License"></a>
-  <a href="https://openhands.dev/joinslack"><img src="https://img.shields.io/badge/Slack-Join%20Us-red?logo=slack&logoColor=white&style=for-the-badge" alt="Join our Slack community"></a>
-  <br>
-  <a href="https://docs.openhands.dev/openhands/usage/cli/installation"><img src="https://img.shields.io/badge/Documentation-000?logo=googledocs&logoColor=FFE165&style=for-the-badge" alt="Check out the documentation"></a> 
-  <br>
-  <!-- Keep these links. Translations will automatically update with the README. -->
-  <a href="https://www.readme-i18n.com/OpenHands/OpenHands-CLI?lang=de">Deutsch</a> |
-  <a href="https://www.readme-i18n.com/OpenHands/OpenHands-CLI?lang=es">Español</a> |
-  <a href="https://www.readme-i18n.com/OpenHands/OpenHands-CLI?lang=fr">français</a> |
-  <a href="https://www.readme-i18n.com/OpenHands/OpenHands-CLI?lang=ja">日本語</a> |
-  <a href="https://www.readme-i18n.com/OpenHands/OpenHands-CLI?lang=ko">한국어</a> |
-  <a href="https://www.readme-i18n.com/OpenHands/OpenHands-CLI?lang=pt">Português</a> |
-  <a href="https://www.readme-i18n.com/OpenHands/OpenHands-CLI?lang=ru">Русский</a> |
-  <a href="https://www.readme-i18n.com/OpenHands/OpenHands-CLI?lang=zh">中文</a>
-</div>
-</br>
 <hr>
 
-Run OpenHands agent inside your terminal, favorite IDE, CI pipelines, local browser, or secure OpenHands Cloud sandboxes.
+Give it one task, it drives the agent to completion, prints a conversation summary,
+and exits. Built for CI pipelines, scripts, and automation. Ships either as a Python
+package run through `uv`, or as a single standalone binary.
+
+> This is a customized fork. The OpenHands SDK is vendored under `vendor/` so we can
+> modify it directly and compile it into the binary. See `AGENTS.md` for the full
+> developer guide.
 
 ## Installation
 
-### Using uv (Recommended)
+### From source (development)
 
-Requires Python 3.12+ and [uv](https://docs.astral.sh/uv/) 0.11.6 or newer.
-
-```bash
-uv tool install openhands --python 3.12
-```
-
-### Executable Binary
-
-Install the standalone binary with the install script:
+Requires Python 3.12 and [uv](https://docs.astral.sh/uv/) 0.11.6+.
 
 ```bash
-curl -fsSL https://install.openhands.dev/install.sh | sh
+uv sync                       # install dependencies (vendored SDK as editable)
+uv run openhands --task "..." # run
 ```
 
+### Standalone binary
+
+Build a single-file executable with PyInstaller:
+
+```bash
+./build.sh --install-pyinstaller   # first build (installs pyinstaller)
+./build.sh                         # subsequent builds
+./dist/openhands --help            # smoke test
+```
+
+Optionally put it on your PATH:
+
+```bash
+sudo install -m755 dist/openhands /usr/local/bin/openhands
+```
 
 ## Usage
 
-### Quick Start
-The first time you run the CLI, it will guide you through configuring your LLM settings:
+The CLI runs exactly one task and exits. `--task` or `--file` is required.
 
 ```bash
-openhands
+# Run a task
+openhands --task "Fix the failing test in auth.py"
+
+# Read the task from a file
+openhands --file task.md
+
+# Resume a previous conversation and continue
+openhands --resume <conversation-id> --task "continue"
 ```
 
+### Options
 
-### Configuration
+| Flag | Description |
+| --- | --- |
+| `-t`, `--task <text>` | Task text to run |
+| `-f`, `--file <path>` | Read the task text from a file |
+| `--resume <id>` | Resume an existing conversation by ID |
+| `--llm-approve` | Enable the LLM security analyzer (only high-risk actions are confirmed). Without it, all actions are auto-approved |
+| `--override-with-envs` | Apply `LLM_API_KEY` / `LLM_MODEL` / `LLM_BASE_URL` from the environment (ignored by default, not persisted) |
+| `-v`, `--version` | Print the version and exit |
 
-OpenHands CLI stores configuration under `~/.openhands/` (created on first run):
+On completion the CLI prints the conversation ID and a hint to resume it:
 
-- `agent_settings.json`: persisted agent settings (including condenser config)
-- `cli_config.json`: CLI/TUI preferences (e.g., critic enabled)
-- `mcp.json`: MCP server configuration
+```
+Conversation ID: f4a88f49...
+Hint: run openhands --resume f4a88f49-... to resume this conversation.
+```
 
-By default, environment variables like `LLM_API_KEY`, `LLM_MODEL`, and `LLM_BASE_URL` are ignored; pass `--override-with-envs` to apply them (not persisted).
+## Configuration
 
-### Running Modes
+### LLM settings
 
-| Mode | Command | Best For |
+By default `LLM_API_KEY`, `LLM_MODEL`, and `LLM_BASE_URL` in the environment are
+**ignored**. Pass `--override-with-envs` to apply them for the run. A `.env` file in
+the current directory is loaded automatically on startup.
+
+### Paths (overridable via environment)
+
+| Env var | Default | Purpose |
 | --- | --- | --- |
-| [Terminal (TUI)](https://docs.openhands.dev/openhands/usage/cli/terminal) | `openhands` | Interactive development |
-| [IDE Integration](https://docs.openhands.dev/openhands/usage/cli/ide/overview) | `openhands acp` | IDEs (Toad, Zed, VSCode, JetBrains, etc) |
-| [Headless](https://docs.openhands.dev/openhands/usage/cli/headless) | `openhands --headless -t "task"` | CI, scripts, and automation |
-| [Web Interface](https://docs.openhands.dev/openhands/usage/cli/web-interface) | `openhands web` | Browser-based TUI |
-| [GUI Server](https://docs.openhands.dev/openhands/usage/cli/gui-server) | `openhands serve` | [Full web GUI](https://github.com/OpenHands/OpenHands)|
+| `OPENHANDS_PERSISTENCE_DIR` | `~/.openhands` | Agent settings (`agent_settings.json`) and `mcp.json` |
+| `OPENHANDS_CONVERSATIONS_DIR` | `~/.openhands/conversations` | Stored conversations (used by `--resume`) |
+| `OPENHANDS_WORK_DIR` | current directory | Where the agent operates |
 
-## Features
+### MCP servers
 
-### [MCP Servers](https://docs.openhands.dev/openhands/usage/cli/mcp-servers)
+Extend the agent with [Model Context Protocol](https://modelcontextprotocol.io/)
+servers by editing `~/.openhands/mcp.json`. Enabled servers are attached to the agent
+automatically at runtime. Example:
 
-Extend OpenHands capabilities with [Model Context Protocol (MCP)](https://modelcontextprotocol.io/) servers:
-
-```bash
-# List configured servers
-openhands mcp list
-
-# Add a server
-openhands mcp add tavily --transport stdio \
-  npx -- -y mcp-remote "https://mcp.tavily.com/mcp/?tavilyApiKey=<your-api-key>"
-
-# Enable/disable servers
-openhands mcp enable <server-name>
-openhands mcp disable <server-name>
+```json
+{
+  "mcpServers": {
+    "tavily": {
+      "command": "npx",
+      "args": ["-y", "mcp-remote", "https://mcp.tavily.com/mcp/?tavilyApiKey=<key>"],
+      "enabled": true
+    }
+  }
+}
 ```
 
-### [Confirmation Modes](https://docs.openhands.dev/openhands/usage/cli/command-reference)
-
-Control how the agent handles actions:
+## Development
 
 ```bash
-# Default: ask for confirmation on each action
-openhands
-
-# Auto-approve all actions
-openhands --always-approve  # or --yolo
-
-# LLM-based security analyzer
-openhands --llm-approve
+make install        # uv sync
+make install-dev    # uv sync --group dev
+make lint           # ruff check openhands_cli/
+make format         # ruff format
+make test           # pytest (excludes tests/snapshots)
+uv run pyright      # type check
 ```
 
-### [Cloud Conversations](https://docs.openhands.dev/openhands/usage/cli/cloud)
-
-Run tasks on OpenHands Cloud. First, authenticate with OpenHands Cloud to fetch your settings:
-
-```bash
-# Login to OpenHands Cloud
-openhands login
-
-# Run a task on OpenHands Cloud
-openhands cloud -t "Fix the login bug"
-```
-
-
-### [Headless Mode](https://docs.openhands.dev/openhands/usage/cli/headless)
-
-Run OpenHands without the interactive UI for CI/CD pipelines and automation:
-
-```bash
-openhands --headless -t "Write unit tests for auth.py"
-openhands --headless -f instructions.md  # or use a file
-
-# With JSON output for parsing
-openhands --headless --json -t "Create a Flask app"
-```
-
-### Resume Conversations
-
-```bash
-openhands --resume              # list recent conversations
-openhands --resume <id>         # resume specific conversation
-openhands --resume --last       # resume most recent
-```
-
-## Documentation
-
-For complete documentation, visit https://docs.openhands.dev/openhands/usage/cli.
+Modifying the SDK: edit source under `vendor/openhands-sdk/` or
+`vendor/openhands-tools/` (editable, changes take effect immediately), verify with
+`uv run openhands --task "..."`, then rebuild the binary with `./build.sh`. See
+`AGENTS.md` for details.
 
 ## License
 
-MIT License - see [LICENSE](LICENSE) for details.
-
-<hr>
-
-### Thank You to Our Contributors
-
-<div align="center">
-  <a href="https://github.com/OpenHands/OpenHands-CLI/graphs/contributors"><img src="https://assets.openhands.dev/readme/openhands-openhands-cli-contributors.svg" /></a>
-</div>
-
-<hr>
-
-### Trusted by Engineers at
-
-<div align="center">
-  
-  <br/><br/>
-  <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="https://assets.openhands.dev/logos/external/white/tiktok.svg">
-    <img src="https://assets.openhands.dev/logos/external/black/tiktok.svg" alt="TikTok" height="17" hspace="5">
-  </picture>
-  <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="https://assets.openhands.dev/logos/external/white/vmware.svg">
-    <img src="https://assets.openhands.dev/logos/external/black/vmware.svg" alt="VMware" height="17" hspace="5">
-  </picture>
-  <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="https://assets.openhands.dev/logos/external/white/roche.svg">
-    <img src="https://assets.openhands.dev/logos/external/black/roche.svg" alt="Roche" height="17" hspace="5">
-  </picture>
-  <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="https://assets.openhands.dev/logos/external/white/amazon.svg">
-    <img src="https://assets.openhands.dev/logos/external/black/amazon.svg" alt="Amazon" height="17" hspace="5">
-  </picture>
-  <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="https://assets.openhands.dev/logos/external/white/c3-ai.svg">
-    <img src="https://assets.openhands.dev/logos/external/black/c3-ai.svg" alt="C3 AI" height="17" hspace="5">
-  </picture>
-  <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="https://assets.openhands.dev/logos/external/white/netflix.svg">
-    <img src="https://assets.openhands.dev/logos/external/black/netflix.svg" alt="Netflix" height="17" hspace="5">
-  </picture>
-  <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="https://assets.openhands.dev/logos/external/white/mastercard.svg">
-    <img src="https://assets.openhands.dev/logos/external/black/mastercard.svg" alt="Mastercard" height="17" hspace="5">
-  </picture>
-  <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="https://assets.openhands.dev/logos/external/white/red-hat.svg">
-    <img src="https://assets.openhands.dev/logos/external/black/red-hat.svg" alt="Red Hat" height="17" hspace="5">
-  </picture>
-  <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="https://assets.openhands.dev/logos/external/white/mongodb.svg">
-    <img src="https://assets.openhands.dev/logos/external/black/mongodb.svg" alt="MongoDB" height="17" hspace="5">
-  </picture>
-  <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="https://assets.openhands.dev/logos/external/white/apple.svg">
-    <img src="https://assets.openhands.dev/logos/external/black/apple.svg" alt="Apple" height="17" hspace="5">
-  </picture>
-  <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="https://assets.openhands.dev/logos/external/white/nvidia.svg">
-    <img src="https://assets.openhands.dev/logos/external/black/nvidia.svg" alt="NVIDIA" height="17" hspace="5">
-  </picture>
-  <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="https://assets.openhands.dev/logos/external/white/google.svg">
-    <img src="https://assets.openhands.dev/logos/external/black/google.svg" alt="Google" height="17" hspace="5">
-  </picture>
-</div>
+MIT License — see [LICENSE](LICENSE) for details.
